@@ -1,14 +1,14 @@
 const postRepository = require('../repositories/postRepository');
 
-function listPosts() {
+async function listPosts() {
   return postRepository.findAll();
 }
 
-function getPost(id) {
+async function getPost(id) {
   return postRepository.findById(id);
 }
 
-function createPost(fields) {
+async function createPost(fields) {
   if (!fields || !fields.title) {
     const error = new Error('Title is required');
     error.statusCode = 422;
@@ -22,14 +22,14 @@ function createPost(fields) {
   });
 }
 
-function updatePost(id, patch) {
+async function updatePost(id, patch) {
   const changes = {};
   if (patch.title !== undefined) changes.title = patch.title;
   if (patch.body !== undefined) changes.body = patch.body;
   return postRepository.update(id, changes);
 }
 
-function removePost(id) {
+async function removePost(id) {
   return postRepository.remove(id);
 }
 

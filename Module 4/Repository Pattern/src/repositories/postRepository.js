@@ -1,38 +1,63 @@
-// Replacing this in-memory Map with Prisma will change storage access only; the service contract remains unchanged.
-const posts = new Map([
-  [1, { id: 1, title: 'First post', body: 'Repository boundaries protect change.', authorId: 7 }],
-  [2, { id: 2, title: 'Second post', body: 'Services should speak in domain language.', authorId: 8 }],
-]);
+const prisma = require('../db/prisma');
 
-let nextId = 3;
+function databaseError(error) {
+  if (error && error.code === 'P2002') {
+    const conflict = new Error('The requested relationship already exists');
+    conflict.statusCode = 409;
+    return conflict;
+  }
 
-function findAll() {
-  return Array.from(posts.values(), (post) => ({ ...post }));
+  if (error && error.code === 'P2003') {
+    const invalidRelation = new Error('The related record does not exist');
+    invalidRelation.statusCode = 422;
+    return invalidRelation;
+  }
+
+  return error;
 }
 
-function findById(id) {
-  const post = posts.get(Number(id));
-  return post ? { ...post } : null;
+async function findAll() {
+  return prisma.post.findMany({ orderBy: { id: 'asc' } });
 }
 
-function create(fields) {
-  const post = { id: nextId++, ...fields };
-  posts.set(post.id, post);
-  return { ...post };
+async function findById(id) {
+  return prisma.post.findUnique({ where: { id: Number(id) } });
 }
 
-function update(id, patch) {
-  const postId = Number(id);
-  const post = posts.get(postId);
+async function create(fields) {
+  try {
+    return await prisma.post.create({
+      data: {
+        title: fields.title,
+        body: fields.body || '',
+        authorId: fields.authorId,
+      },
+    });
+  } catch (error) {
+    throw databaseError(error);
+  }
+}
+
+async function update(id, patch) {
+  const post = await findById(id);
   if (!post) return null;
 
-  const updatedPost = { ...post, ...patch, id: postId };
-  posts.set(postId, updatedPost);
-  return { ...updatedPost };
+  try {
+    return await prisma.post.update({
+      where: { id: Number(id) },
+      data: patch,
+    });
+  } catch (error) {
+    throw databaseError(error);
+  }
 }
 
-function remove(id) {
-  return posts.delete(Number(id));
+async function remove(id) {
+  const post = await findById(id);
+  if (!post) return false;
+
+  await prisma.post.delete({ where: { id: Number(id) } });
+  return true;
 }
 
 module.exports = { findAll, findById, create, update, remove };
